@@ -1,0 +1,36 @@
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:{$PORT} {
+	# Health check for Railway: answers without a login, but only when the
+	# KrillinAI server behind Caddy is up (it serves its static UI page).
+	handle /healthz {
+		rewrite * /static/
+		reverse_proxy 127.0.0.1:8888
+	}
+
+	handle {
+		basic_auth {
+			{$ADMIN_USER} {$ADMIN_PASSWORD_HASH}
+		}
+		reverse_proxy 127.0.0.1:8888 {
+			flush_interval -1
+			transport http {
+				read_timeout 30m
+				write_timeout 30m
+			}
+		}
+	}
+
+	log {
+		output stdout
+		format console
+		level ERROR
+	}
+}

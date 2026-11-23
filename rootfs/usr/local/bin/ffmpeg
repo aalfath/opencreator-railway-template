@@ -1,0 +1,22 @@
+#!/bin/sh
+# Thread cap for ffmpeg. Railway shows the host's CPU count (often 32) inside a
+# small service, and libx264 starts about 1.5 threads per CPU, each with its own
+# frame buffers. On a 0.5-1 GB service that is enough to get OOM-killed during
+# subtitle burn-in, so cap encoder and filter threads (FFMPEG_THREADS, default 2).
+REAL=/usr/bin/ffmpeg
+N="${FFMPEG_THREADS:-2}"
+has_input=0
+for a in "$@"; do [ "$a" = "-i" ] && has_input=1 && break; done
+if [ "$has_input" -eq 0 ] || [ "$N" = "0" ] || [ "$#" -lt 2 ]; then
+  exec "$REAL" "$@"
+fi
+# Put "-threads N" right before the output (the last argument).
+last=""
+i=0
+count=$#
+for a in "$@"; do
+  i=$((i + 1))
+  if [ "$i" -eq 1 ]; then set --; fi
+  if [ "$i" -eq "$count" ]; then last="$a"; else set -- "$@" "$a"; fi
+done
+exec "$REAL" -filter_threads "$N" -filter_complex_threads "$N" "$@" -threads "$N" "$last"
